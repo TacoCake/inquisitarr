@@ -1,8 +1,17 @@
 #!/bin/bash
 
 # Configuration
-API_URL="http://IP:5055/api/v1"
-API_KEY="YOUR_JELLYSEERR_API_KEY"
+# Define these variables in the .env
+# API_URL="https://localhost:5055/api/v1"
+# API_KEY="jellyseerr api key"
+# MOVIE_DB_TOKEN="movie_db_token"
+
+cd "$(dirname "$0")"
+
+# load env file
+set -a
+source .env
+set +a
 
 # Ask user for keyword
 read -p "Enter the keyword to search: " KEYWORD
@@ -41,8 +50,10 @@ echo "Keyword ID found: $KEYWORD_ID"
 
 # 2. Get list of movies with this keyword
 echo "Retrieving movies with this keyword..."
-MOVIES_RESPONSE=$(curl -s -H "X-Api-Key: $API_KEY" \
-    "$API_URL/discover/keyword/$KEYWORD_ID/movies")
+MOVIES_RESPONSE=$(curl -s --request GET \
+        --url "https://api.themoviedb.org/3/discover/movie?include_adult=true&include_video=true&language=en-US&page=1&sort_by=popularity.desc&with_keywords=$KEYWORD_ID" \
+        --header "Authorization: Bearer $MOVIEDB_TOKEN" \
+        --header 'accept: application/json')
 
 # Check if response is valid JSON
 if ! echo "$MOVIES_RESPONSE" | jq empty 2>/dev/null; then
@@ -51,7 +62,7 @@ if ! echo "$MOVIES_RESPONSE" | jq empty 2>/dev/null; then
 fi
 
 # Extract movie list
-TOTAL_PAGES=$(echo "$MOVIES_RESPONSE" | jq -r '.totalPages')
+TOTAL_PAGES=$(echo "$MOVIES_RESPONSE" | jq -r '.total_pages')
 if [ -z "$TOTAL_PAGES" ] || [ "$TOTAL_PAGES" = "null" ]; then
     echo "Error: Unable to determine total number of pages"
     exit 1
@@ -63,9 +74,11 @@ echo "Total number of pages to process: $TOTAL_PAGES"
 for ((page=1; page<=TOTAL_PAGES; page++)); do
     echo "Processing page $page/$TOTAL_PAGES..."
     
-    MOVIES_PAGE_RESPONSE=$(curl -s -H "X-Api-Key: $API_KEY" \
-        "$API_URL/discover/keyword/$KEYWORD_ID/movies?page=$page")
-    
+    MOVIES_PAGE_RESPONSE=$(curl -s --request GET \
+            --url "https://api.themoviedb.org/3/discover/movie?include_adult=true&include_video=true&language=en-US&page=$page&sort_by=popularity.desc&with_keywords=$KEYWORD_ID" \
+            --header "Authorization: Bearer $MOVIEDB_TOKEN" \
+            --header 'accept: application/json')
+
     # Check if response is valid JSON
     if ! echo "$MOVIES_PAGE_RESPONSE" | jq empty 2>/dev/null; then
         echo "Error: Invalid JSON response for page $page"
